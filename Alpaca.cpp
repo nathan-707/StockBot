@@ -308,20 +308,31 @@ void AlpacaAccount::printAccountInformation(int startingInvestmentInAccount) {
     Serial.print("Symbol:          ");
     Serial.print(allPositions[i].symbol);
     Serial.println(allPositions[i].isCrypto ? " (CRYPTO)" : "");
-    Serial.print("Qty Available:   ");
-    Serial.println(allPositions[i].qty_available, 6);
-    Serial.print("Avg Price Paid:  $");
-    Serial.println(allPositions[i].pricePaid, 2);
-    Serial.print("Current Price:   $");
-    Serial.println(allPositions[i].currentUnitPrice, 2);
+    // Serial.print("Qty Available:   ");
+    // Serial.println(allPositions[i].qty_available, 6);
+    // Serial.print("Avg Price Paid:  $");
+    // Serial.println(allPositions[i].pricePaid, 2);
+    // Serial.print("Current Price:   $");
+    // Serial.println(allPositions[i].currentUnitPrice, 2);
     Serial.print("Market Value:    $");
     Serial.println(allPositions[i].marketValue, 2);
     Serial.print("Total Profit:    $");
+    if (allPositions[i].totalProfit_dollars > 0) {
+      Serial.print("+");
+    }
     Serial.println(allPositions[i].totalProfit_dollars, 2);
     Serial.print("Change (Total):  ");
+    if (allPositions[i].percentChange > 0) {
+      Serial.print("+");
+    }
     Serial.print(allPositions[i].percentChange * 100, 2);
     Serial.println("%");
+
+
     Serial.print("Change (Today):  ");
+    if (allPositions[i].percentChangeToday > 0) {
+      Serial.print("+");
+    }
     Serial.print(allPositions[i].percentChangeToday * 100, 2);
     Serial.println("%");
   }

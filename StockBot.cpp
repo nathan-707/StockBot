@@ -1,3 +1,4 @@
+#include "esp32-hal.h"
 #include "HardwareSerial.h"
 #include "StockBot.h"
 #include <WiFi.h>
@@ -13,15 +14,42 @@
 // TODO: serialize overall account profit into the prompts too for the ai.
 // TODO: find way to disable server time out when calling geminin
 
+String sellActionRawName(SellAction action) {
+  if (action == SellAction::HOLD) {  // Added "SellAction::"
+    return "HOLD";
+  } else if (action == SellAction::SELL_ALL) {  // Added "SellAction::"
+    return "SELL_ALL";
+  } else if (action == SellAction::SELL_HALF) {  // Added missing case
+    return "SELL_HALF";
+  }
+  return "UNKNOWN";
+}
 // --- CONSTRUCTOR ---
 StockBot::StockBot(bool is_paperTrading, int totalAccountInvestmentIntoAccount,
                    const char* real_key, const char* real_secret,
-                   const char* paper_key, const char* paper_secret, const char* geminiKey)
+                   const char* paper_key, const char* paper_secret, const char* geminiKey, BotConfiguration configuration)
   // 1. Initializer List: Calls the AlpacaAccount constructor immediately
   : account(real_key, real_secret, paper_key, paper_secret, is_paperTrading, totalAccountInvestmentIntoAccount) {
 
-  Serial.println("\n--- StockBot Ready ---");
+
   apiKey = geminiKey;
+  this->configuration = configuration;
+  Serial.println(configuration.name);
+  Serial.println(configuration.reinvestIfRecommended ? "Reinvesting" : "Reinvesting off");
+  Serial.println(configuration.minimum_AI_Confidence_Level_In_Order_To_BUY);
+  Serial.println("--- StockBot Ready ---");
+}
+
+
+
+Status StockBot::getStatus() {
+  if (usingAI) {
+    return Status::BUSY;
+  } else if (succesfullyGotSellSuggestions && succesfullyGotBuySuggestions) {
+    return Status::WORKING;
+  } else {
+    return Status::ERROR;
+  }
 }
 
 void StockBot::printStat(String nameOfObject, String printObject) {
@@ -34,124 +62,6 @@ void StockBot::printStat(String nameOfObject, int printObject) {
   Serial.println(printObject);
 }
 
-String sellActionRawName(SellAction action) {
-  if (action == SellAction::HOLD) {  // Added "SellAction::"
-    return "HOLD";
-  } else if (action == SellAction::SELL_ALL) {  // Added "SellAction::"
-    return "SELL_ALL";
-  } else if (action == SellAction::SELL_HALF) {  // Added missing case
-    return "SELL_HALF";
-  }
-  return "UNKNOWN";
-}
-
-
-bool StockBot::monitorStocksWithGemini(BotConfiguration configuration) {
-  // --- 1. PREPARE ---
-  bool succesfullyGotSellSuggestions = false;
-  bool succesfullyGotBuySuggestions = false;
-
-  if (account.updateAccount() == false) {
-    Serial.println("FAILED TO UPDATE ACCOUNT. ABORTING AI CALLS...");
-    return false;
-  }
-
-  if (configuration.assetTypeToBeBought == TradeMode::STOCKS_ONLY && marketIsOpen() == false) {
-    Serial.println("Trade stocks only is true, and the market is closed. Bailing out.");
-    return true;
-  }
-
-  // --- 2. GET AI INSIGHTS ---
-  if (configuration.reinvestIfRecommended) {
-    succesfullyGotBuySuggestions = getGemini_BUY_Suggestions(configuration.assetTypeToBeBought);
-  } else {
-    Serial.println("Auto reinvest off. Skipping get buy recommendations.");
-    succesfullyGotBuySuggestions = true; // no need to get buy suggestions, not buying.
-  }
-
-
-  if (configuration.logOutput) print___Gemini_BUY_StockSuggestions();
-
-  succesfullyGotSellSuggestions = getGemini_SELL_StockSuggestions();
-  if (configuration.logOutput && succesfullyGotSellSuggestions) print___Gemini_SELL_StockSuggestions();
-  // note: if it fails to get either one of these, all the recommendations will be empty so its safe to still try to buy or sell because if its empty nothing will happen.
-
-  // --- 3. EXECUTE SELLS ---
-  bool did_sell_something = sellAllGeminiSellSuggestions();
-
-  // Wait for sells to register, then refresh balance
-  if (did_sell_something) {
-    delay(2000);
-    account.updateAccount();
-  }
-
-  // --- 4. CALCULATE INVESTMENT AMOUNT ---
-  int totalInvested = account.details.totalNetWorth - account.details.buyingPower;
-  // float amountToInvest = 0;
-
-  // // Strategy: Are we topping up to a minimum? Or just investing surplus?
-  // if (totalInvested < configuration.minimum_to_have_invested_at_all_times) {
-  //   // GAP FILL: We are under-invested. Calculate the gap.
-  //   amountToInvest = configuration.minimum_to_have_invested_at_all_times - totalInvested;
-  //   Serial.print("Investments are below the investment minimum. Investing the amount needed to reach investment minimum which is ");
-  //   Serial.println(amountToInvest);
-  // } else {
-  // GROWTH: We hit our minimum. Use AI's suggested amount for growth.
-  float amountToInvest = geminiBuyRecommendation.recommendedAmountToInvest;
-  // }
-
-  // SAFETY: Never invest more than we have!
-
-  if (account.details.buyingPower < assetBuyMinimum || noGeminiBuyRecommendations() == true) {
-    Serial.println("Not enough money to buy, or no recommendations. bailing early.");
-    return true;
-  } else if (geminiBuyRecommendation.recommendedAmountToInvest > account.details.buyingPower || geminiBuyRecommendation.recommendedAmountToInvest < assetBuyMinimum) {
-    Serial.println("gemini tried to invest either more than whats in account, or less than the assetBuyMinimum. setting amount to invest to the minimum instead.");
-    amountToInvest = assetBuyMinimum;
-  }
-
-
-
-
-  // --- 5. DECIDE TO BUY ---
-  // We buy if: (We sold & want to reinvest) OR (We are under our minimum target)
-  // bool should_buy = (did_sell_something && configuration.reinvest_after_sell) || (totalInvested < configuration.minimum_to_have_invested_at_all_times);
-
-
-
-
-  // // Override: If we are flush with cash (Cash > Target), we should also buy (The "Cash Rich" rule)
-  // if (account.details.buyingPower >= configuration.minimum_to_have_invested_at_all_times) {
-  //   should_buy = true;
-  // }
-
-
-
-  // --- 6. EXECUTE BUY ---
-  if (configuration.reinvestIfRecommended && succesfullyGotBuySuggestions) {
-
-    if (configuration.logOutput) print___Gemini_BUY_StockSuggestions();
-
-    // if (totalInvested < configuration.minimum_to_have_invested_at_all_times) {
-    //   Serial.println("Investments are below minimum. Buying assets...");
-    // }
-
-    if (amountToInvest > assetBuyMinimum) {
-      buyDiversifiedGeminiStockSuggestions(amountToInvest, configuration.minimum_AI_Confidence_Level_In_Order_To_BUY);
-    } else {
-      buyFirstGeminiStockSuggestion(amountToInvest);
-    }
-  }
-
-  // --- 7. REPORTING ---
-  if (configuration.logOutput) {
-    account.updateAccount();
-    account.printAccountInformation(account.details.accountStartingInvestment);
-  }
-
-
-  return (succesfullyGotSellSuggestions && succesfullyGotBuySuggestions);
-}
 
 void StockBot::print___Gemini_BUY_StockSuggestions() {
   Serial.println();
@@ -221,8 +131,6 @@ bool StockBot::noGeminiBuyRecommendations() {
   }
   return empty;
 }
-
-
 
 void StockBot::clearGeminiSellRecommendations() {
   for (int i = 0; i < maxSize; i++) {
@@ -296,9 +204,6 @@ bool StockBot::sellAllGeminiSellSuggestions() {
   return soldSomething;
 }
 
-
-
-
 bool StockBot::marketIsOpen() {
   // 1. Initial Time Configuration (Run once)
   if (timeNotConfigured) {
@@ -344,8 +249,7 @@ bool StockBot::marketIsOpen() {
   return (currentMinutes >= MARKET_OPEN_MINUTES && currentMinutes < MARKET_CLOSE_MINUTES);
 }
 
-
-bool StockBot::getGemini_BUY_Suggestions(TradeMode tradeType) {
+bool StockBot::getGemini_BUY_Suggestions(BotConfiguration configuration) {
   bool success = false;
 
   // 1. Account Safety Check
@@ -359,13 +263,15 @@ bool StockBot::getGemini_BUY_Suggestions(TradeMode tradeType) {
   // 2. Determine "Mode" (Crypto vs Stocks)
   bool isCryptoMode = false;
 
-  if (tradeType == TradeMode::CRYPTO_ONLY) {
+
+
+  if (configuration.assetTypeToBeBought == TradeMode::CRYPTO_ONLY) {
     isCryptoMode = true;
     Serial.println("Mode: CRYPTO_ONLY");
-  } else if (tradeType == TradeMode::STOCKS_ONLY) {
+  } else if (configuration.assetTypeToBeBought == TradeMode::STOCKS_ONLY) {
     isCryptoMode = false;
     Serial.println("Mode: STOCKS_ONLY");
-  } else if (tradeType == TradeMode::STOCKS_AND_CRYPTO) {
+  } else if (configuration.assetTypeToBeBought == TradeMode::STOCKS_AND_CRYPTO) {
     if (marketIsOpen()) {
       isCryptoMode = false;
       Serial.println("Mode: STOCKS_AND_CRYPTO (Market OPEN -> Stocks)");
@@ -381,8 +287,7 @@ bool StockBot::getGemini_BUY_Suggestions(TradeMode tradeType) {
 
   // 3. Prepare Logic Strings
 
-  // String activePrompt = isCryptoMode ? crypto_Buying_Recommendations_Prompt : regularStocks_Buying_Recommendations_Prompt;
-  String activePrompt = outsmart_the_market_Prompt;
+  String activePrompt = isCryptoMode ? configuration.buying_prompt_crypto : configuration.buying_prompt_stocks;
 
 
   String symbolDescription = isCryptoMode ? "The crypto ticker symbol. format 'SYMBOL/USD' (e.g., BTC/USD, ETH/USD)." : "The stock ticker symbol (e.g., AAPL, TSLA).";
@@ -560,7 +465,7 @@ bool StockBot::getGemini_BUY_Suggestions(TradeMode tradeType) {
   return success;
 }
 
-bool StockBot::getGemini_SELL_StockSuggestions() {
+bool StockBot::getGemini_SELL_StockSuggestions(BotConfiguration configuration) {
   bool success = false;
 
   // 1. Account Safety Check
@@ -578,7 +483,7 @@ bool StockBot::getGemini_SELL_StockSuggestions() {
   serializedPositions.replace("\"", "\\\"");  // Escape quotes for JSON injection
 
   // Prepare prompt text
-  String cleanPromptText = gemini_Sell_Recommendation_prompt;
+  String cleanPromptText = configuration.selling_prompt;
   cleanPromptText.replace("\"", "\\\"");  // Escape quotes inside the prompt itself
 
   // Combine into final prompt string
@@ -740,7 +645,6 @@ bool StockBot::getGemini_SELL_StockSuggestions() {
   return success;
 }
 
-
 void StockBot::buyDiversifiedGeminiStockSuggestions(float dollarsToInvest, float minimumConfidenceLevelToBuy) {
 
   if (account.updateAccount() == false) {
@@ -855,10 +759,142 @@ void StockBot::buyFirstGeminiStockSuggestion(float dollarsToInvest) {
   }
 }
 
-const char* harleyPersonality = "Harley is a risk taker. he wants to make big money.";
-const char* jarvisPersonality = "Jarvis is very anaytical and seeks to provide the most resonable answers as objectivetly as possible.";
-const char* tonyStarkPersonality = "Toney Stark is charming also very inteligent. he strikes in the middle of being a risk taker, with also very logical and collected.";
-const char* counselMeetingPrompt = "You are the judge to a cousel of 3 people. all 3 people will give their cases as to whether or not they they think the cousel should buy a given symbol to make a over net profit in the day trade. You are also to decide on the next date the cousel will reassemble to discuss the position or next day trade buy.";
+void StockBot::getTimeUntilNextRoutine() {
+  // 1. Calculate the interval in milliseconds
+  unsigned long intervalMillis = (unsigned long)configuration.ai_check_interval_HOURS * 3600000UL;
+
+  // 2. Calculate how much time has passed since the last execution
+  unsigned long elapsedMillis = millis() - monitorTimer;
+
+  // 3. Handle the case where the interval is already reached or the timer hasn't started
+  if (elapsedMillis >= intervalMillis) {
+    Serial.println("Next routine: Due now");
+    return;
+  }
+
+  // 4. Calculate remaining time
+  unsigned long remainingMillis = intervalMillis - elapsedMillis;
+
+  // 5. Convert to human-readable format (Hours and Minutes)
+  float hoursRemaining = (float)remainingMillis / 3600000.0f;
+  int wholeHours = remainingMillis / 3600000UL;
+  int wholeMinutes = (remainingMillis % 3600000UL) / 60000UL;
+
+  Serial.print("Time until next monitor: ");
+  Serial.print(wholeHours);
+  Serial.print("h ");
+  Serial.print(wholeMinutes);
+  Serial.println("m");
+}
+
+// TRADE ROUTINES /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// #1
+void StockBot::monitor() {
+
+  if (configuration.ai_check_interval_HOURS <= 0 || (millis() - monitorTimer < (unsigned long)configuration.ai_check_interval_HOURS * 3600000UL)) {
+    return;
+  }
+
+  monitorTimer = millis();
+  
+  Serial.print("\n" + configuration.name);
+  Serial.print(": ");
+
+  if (configuration.routine == TradeRoutine::Routine_1) {
+
+    Serial.println("Routine #1");
+
+    // --- 1. PREPARE ---
+    if (account.updateAccount() == false) {
+      Serial.println("FAILED TO UPDATE ACCOUNT. ABORTING AI CALLS...");
+      accountError = true;
+      return;
+    } else {
+      accountError = false;
+    }
+
+    if (configuration.assetTypeToBeBought == TradeMode::STOCKS_ONLY && marketIsOpen() == false) {
+      Serial.println("Trade stocks only is true, and the market is closed. Bailing out.");
+      return;
+    }
+
+    usingAI = true;
+
+    // --- 2. GET AI INSIGHTS ---
+    if (configuration.reinvestIfRecommended) {
+      succesfullyGotBuySuggestions = getGemini_BUY_Suggestions(configuration);
+    } else {
+      Serial.println("Auto reinvest off. Skipping get buy recommendations.");
+      succesfullyGotBuySuggestions = true;  // no need to get buy suggestions, not buying.
+    }
+
+
+    if (configuration.logOutput) print___Gemini_BUY_StockSuggestions();
+    succesfullyGotSellSuggestions = getGemini_SELL_StockSuggestions(configuration);
+    if (configuration.logOutput && succesfullyGotSellSuggestions) print___Gemini_SELL_StockSuggestions();
+    // note: if it fails to get either one of these, all the recommendations will be empty so its safe to still try to buy or sell because if its empty nothing will happen.
+
+    // --- 3. EXECUTE SELLS ---
+    bool did_sell_something = sellAllGeminiSellSuggestions();
+
+    // Wait for sells to register, then refresh balance
+    if (did_sell_something) {
+      delay(2000);
+      account.updateAccount();
+    }
+
+    usingAI = false;
+
+
+    // --- 4. CALCULATE INVESTMENT AMOUNT ---
+    int totalInvested = account.details.totalNetWorth - account.details.buyingPower;
+    float amountToInvest = geminiBuyRecommendation.recommendedAmountToInvest;
+
+    // SAFETY: Never invest more than we have!
+
+    if (account.details.buyingPower < assetBuyMinimum || noGeminiBuyRecommendations() == true || configuration.reinvestIfRecommended == false) {
+      if (configuration.reinvestIfRecommended == false) {
+        Serial.println("Re-investing is off. bailing.");
+      } else {
+        Serial.println("Not enough money to buy, or no recommendations. bailing early.");
+      }
+      return;
+    } else if (geminiBuyRecommendation.recommendedAmountToInvest > account.details.buyingPower || geminiBuyRecommendation.recommendedAmountToInvest < assetBuyMinimum) {
+      Serial.println("gemini tried to invest either more than whats in account, or less than the assetBuyMinimum. setting amount to invest to the minimum instead.");
+      amountToInvest = assetBuyMinimum;
+    }
+
+
+    // --- 6. EXECUTE BUY ---
+    if (succesfullyGotBuySuggestions) {
+
+      if (configuration.logOutput) print___Gemini_BUY_StockSuggestions();
+
+      if (amountToInvest > assetBuyMinimum) {
+        buyDiversifiedGeminiStockSuggestions(amountToInvest, configuration.minimum_AI_Confidence_Level_In_Order_To_BUY);
+      } else {
+        buyFirstGeminiStockSuggestion(amountToInvest);
+      }
+    }
+
+    // --- 7. REPORTING ---
+    if (configuration.logOutput) {
+      account.updateAccount();
+      account.printAccountInformation(account.details.accountStartingInvestment);
+    }
+  }
+
+
+  else if (configuration.routine == TradeRoutine::Routine_2) {
+    Serial.println("Trade Routine #2");
+    // add more routines here as other else ifs if needed.
+  }
+}
+
+
+
 
 // test data to replace real 'serializedPositions' with in 'fetchGemini_sellRecommendations' if want to to test what it would do in cetain snarios.
 // String serializedPositions = R"([

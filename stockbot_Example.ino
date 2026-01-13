@@ -6,6 +6,8 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <Adafruit_NeoPixel.h>
+#include "Configurations.h"
+
 #define PIN 38
 #define NUMPIXELS 1
 
@@ -38,15 +40,20 @@ changed selling prompt to make it make the ai determine what noise levels are
 const bool PAPER = false;            //////
 const int startingInvestment = 700;  //////
 /////////////////////////////////////////////
-BotConfiguration defaultConfig;  /////
+BotConfiguration defaultBotConfig;  /////
 ////////////////////////////////////////////
 
 
 
 
-StockBot stockbot(PAPER, startingInvestment, REAL_API_KEY, REAL_API_SECRET, PAPER_API_KEY, PAPER_API_KEY_SECRET, GEMINI_KEY);
+// StockBot stockbot(PAPER, startingInvestment, REAL_API_KEY, REAL_API_SECRET, PAPER_API_KEY, PAPER_API_KEY_SECRET, GEMINI_KEY, defaultBotConfig);
+StockBot stockbot(PAPER, startingInvestment, REAL_API_KEY, REAL_API_SECRET, PAPER_API_KEY, PAPER_API_KEY_SECRET, GEMINI_KEY, longTermBotConfiguration);
+
+
+
+
 bool everythingWorking = false;
-const unsigned long interval = 3600000;  // 1 hour in milliseconds
+const unsigned long interval = 3600000 * 3;  // 3 hour in milliseconds
 unsigned long previousMillis = interval + 1000;
 unsigned long previousPrintMillis = interval + 1000;
 const unsigned long printInterval = 600000;  // 10 minutes in ms
@@ -55,10 +62,12 @@ bool blink;
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
 // const char* ssid = "NEiPhone";
 // const char* password = "12345678";
-// const char* ssid = "Province.SynergyWifi.com";
-// const char* password = "coldfang75";
-const char* ssid = "eriksen99";
-const char* password = "DCchiro99";
+const char* ssid = "Province.SynergyWifi.com";
+const char* password = "coldfang75";
+// const char* ssid = "eriksen99";
+// const char* password = "DCchiro99";
+unsigned long currentMillis = millis();  // <--- ADD THIS LINE
+
 
 void setup() {
   Serial.begin(9600);   // Make sure your Serial Monitor matches this
@@ -83,69 +92,35 @@ void setup() {
     Serial.print(".");
     delay(500);
   }
-
-
-
-
-
-  // end of setup. put code to run below here.
+  // KICK OFF THE PIXEL TASK
+  xTaskCreatePinnedToCore(
+    pixelTaskCode, /* Function to implement the task */
+    "PixelTask",   /* Name of the task */
+    4200,          /* Stack size in words */
+    NULL,          /* Parameter passed to the task */
+    1,             /* Priority of the task */
+    NULL,          /* Task handle */
+    0);            /* Core 0 */
 }
 
 
 
-void monitorStocks() {
-  pixels.setPixelColor(0, pixels.Color(0, 0, 50));
-  pixels.show();
-  everythingWorking = stockbot.monitorStocksWithGemini(defaultConfig);
-}
 
 
 
 void loop() {
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    monitorStocks();
-  }
-
-  if (currentMillis - previousPrintMillis >= printInterval) {
-    previousPrintMillis = currentMillis;  // Reset print timer
-    unsigned long timePassed = currentMillis - previousMillis;
-    unsigned long timeRemaining = interval - timePassed;
-    Serial.print(timeRemaining / 60000);  // Convert ms to minutes
-    Serial.println(" minutes until next check.");
-  }
 
 
-  if (currentMillis - blinkTimer >= 4000) {
-    blinkTimer = millis();
-    blink = !blink;
-  }
+  stockbot.monitor();
 
-  if (blink) {
-    if (everythingWorking) {
-      pixels.setPixelColor(0, pixels.Color(50, 0, 0));
 
-    } else {
-      pixels.setPixelColor(0, pixels.Color(0, 255, 0));
-    }
-  } else {
-
-    if (everythingWorking) {
-      pixels.setPixelColor(0, pixels.Color(0, 0, 0));
-
-    } else {
-      pixels.setPixelColor(0, pixels.Color(0, 255, 0));
-    }
-  }
-  pixels.show();
 
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
     command.trim();
     if (command == "monitor") {
       Serial.println("Manual Override: Running Stock Monitor now...");
-      monitorStocks();
+      // monitorStocks();
       previousMillis = currentMillis;
     } else if (command == "a") {
       Serial.println("Updating account...");
@@ -155,11 +130,7 @@ void loop() {
       stockbot.print___Gemini_BUY_StockSuggestions();
       stockbot.print___Gemini_SELL_StockSuggestions();
     } else if (command == "t" || command == "time") {
-      unsigned long timePassed = currentMillis - previousMillis;
-      unsigned long timeRemaining = interval - timePassed;
-      Serial.print("Manual Check: ");
-      Serial.print(timeRemaining / 60000);
-      Serial.println(" minutes until next check.");
+      stockbot.getTimeUntilNextRoutine();
     } else if (command == "all") {
       stockbot.print___Gemini_SELL_StockSuggestions();
       stockbot.print___Gemini_BUY_StockSuggestions();
@@ -198,5 +169,41 @@ void loop() {
 
   if (WiFi.status() != WL_CONNECTED) {
     WiFi.reconnect();
+  }
+}
+
+
+void pixelTaskCode(void* pvParameters) {
+  // A FreeRTOS task MUST have an infinite loop to stay alive
+  for (;;) {
+    // Your exact blink timing logic
+    if (millis() - blinkTimer >= 4000) {
+      blinkTimer = millis();
+      blink = !blink;
+    }
+
+    if (blink) {
+      if (stockbot.getStatus() == Status::WORKING) {  // working
+        pixels.setPixelColor(0, pixels.Color(50, 0, 0));
+      } else if (stockbot.getStatus() == Status::ERROR) {  // error
+        pixels.setPixelColor(0, pixels.Color(0, 255, 0));
+      } else if (stockbot.getStatus() == Status::BUSY) {  // ai
+        pixels.setPixelColor(0, pixels.Color(0, 0, 50));
+      }
+    } else {
+      // Your exact "off" logic
+      if (stockbot.getStatus() == Status::ERROR) {  // solid red.
+        pixels.setPixelColor(0, pixels.Color(0, 255, 0));
+      }
+      else if (stockbot.getStatus() == Status::BUSY) {
+        pixels.setPixelColor(0, pixels.Color(0, 0, 50));
+      }
+      else {
+        pixels.setPixelColor(0, pixels.Color(0, 0, 0));  // blink green and blue on and off.
+      }
+    }
+    pixels.show();
+    // Critical: This allows the ESP32 to handle other background tasks
+    vTaskDelay(50 / portTICK_PERIOD_MS);
   }
 }
