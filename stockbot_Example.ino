@@ -183,27 +183,34 @@ void pixelTaskCode(void* pvParameters) {
     }
 
     if (blink) {
-      if (stockbot.getStatus() == Status::WORKING) {  // working
-        pixels.setPixelColor(0, pixels.Color(50, 0, 0));
-      } else if (stockbot.getStatus() == Status::ERROR) {  // error
+
+      if (WiFi.status() != WL_CONNECTED) {
         pixels.setPixelColor(0, pixels.Color(0, 255, 0));
-      } else if (stockbot.getStatus() == Status::BUSY) {  // ai
-        pixels.setPixelColor(0, pixels.Color(0, 0, 50));
+      } else {
+        if (stockbot.getStatus() == Status::WORKING) {  // working
+          pixels.setPixelColor(0, pixels.Color(50, 0, 0));
+        } else if (stockbot.getStatus() == Status::ERROR) {  // error
+          pixels.setPixelColor(0, pixels.Color(0, 255, 0));
+        } else if (stockbot.getStatus() == Status::BUSY) {  // ai
+          pixels.setPixelColor(0, pixels.Color(0, 0, 50));
+        }
       }
+
+
+
+
+
     } else {
       // Your exact "off" logic
       if (stockbot.getStatus() == Status::ERROR) {  // solid red.
         pixels.setPixelColor(0, pixels.Color(0, 255, 0));
-      }
-      else if (stockbot.getStatus() == Status::BUSY) {
+      } else if (stockbot.getStatus() == Status::BUSY) { // flash blue
         pixels.setPixelColor(0, pixels.Color(0, 0, 50));
-      }
-      else {
-        pixels.setPixelColor(0, pixels.Color(0, 0, 0));  // blink green and blue on and off.
+      } else {
+        pixels.setPixelColor(0, pixels.Color(0, 0, 0));  // blink green or red on and off.
       }
     }
     pixels.show();
-    // Critical: This allows the ESP32 to handle other background tasks
     vTaskDelay(50 / portTICK_PERIOD_MS);
   }
 }

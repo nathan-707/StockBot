@@ -68,6 +68,7 @@ struct BotConfiguration {
                    String name
                    ) {
     this->assetTypeToBeBought = assetTypeToBeBought;
+    this->reinvestIfRecommended = reinvestIfRecommended;
     this->ai_check_interval_HOURS = ai_check_interval_HOURS;
     this->minimum_AI_Confidence_Level_In_Order_To_BUY = minimum_AI_Confidence_Level_In_Order_To_BUY;
     this->logOutput = true;

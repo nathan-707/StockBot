@@ -34,10 +34,7 @@ StockBot::StockBot(bool is_paperTrading, int totalAccountInvestmentIntoAccount,
 
   apiKey = geminiKey;
   this->configuration = configuration;
-  Serial.println(configuration.name);
-  Serial.println(configuration.reinvestIfRecommended ? "Reinvesting" : "Reinvesting off");
-  Serial.println(configuration.minimum_AI_Confidence_Level_In_Order_To_BUY);
-  Serial.println("--- StockBot Ready ---");
+ 
 }
 
 
@@ -760,6 +757,14 @@ void StockBot::buyFirstGeminiStockSuggestion(float dollarsToInvest) {
 }
 
 void StockBot::getTimeUntilNextRoutine() {
+
+
+   Serial.println(configuration.name);
+  Serial.println(configuration.reinvestIfRecommended ? "Reinvesting" : "Reinvesting off");
+  Serial.println(configuration.minimum_AI_Confidence_Level_In_Order_To_BUY);
+
+
+
   // 1. Calculate the interval in milliseconds
   unsigned long intervalMillis = (unsigned long)configuration.ai_check_interval_HOURS * 3600000UL;
 
