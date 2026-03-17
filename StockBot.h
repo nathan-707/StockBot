@@ -118,7 +118,8 @@ private:
   bool succesfullyGotSellSuggestions = true;
   bool succesfullyGotBuySuggestions = true;
   bool noGeminiBuyRecommendations();
-  const int assetBuyMinimum = 20;  // minimum amount that can be put into a asset.
+  const int assetBuyMinimum = 50;  // minimum amount that can be put into a asset.
+  const int assetMarketValueMinimumToHold = 20; // if position market value is below this, it will auto liquidate it because it not worth evaluting such a low value position.
   bool marketIsOpen();
   bool timeNotConfigured = true;
   void clearGeminiBuyRecommendations();

@@ -43,6 +43,22 @@
 // }
 
 
+// TEMPLATE BEGIN:
+BotConfiguration templateConfig = BotConfiguration(
+  /*TradeMode enum, assets that can be bought. options are 'STOCKS_AND_CRYPTO', 'STOCKS_ONLY', 'CRYPTO_ONLY'*/ TradeMode::STOCKS_AND_CRYPTO,
+  /*bool, indicates whether or not config should reinvest autonomous or only sell.*/ true,
+  /*int, number of hours to wait to call ai for buy and sell recommendations*/ 3,
+  /*float, minimum confidence ai must have in order to buy*/ 0.5,
+  /*bool that determines to log output.*/ true,
+  /*TradeRoutine enum, only use Routine_1*/ TradeRoutine::Routine_1,
+  /*String, prompt used to find good regular stocks to buy. not used if crypto only.*/ "ai, what are good stocks to buy?",
+  /*String, prompt used to find good crypto to buy. not used if stocks only.*/ "ai, what is good crypto to buy?",
+  /*String, prompt used to find out what are good current positions you have to sell.*/ "ai, which of my positions should i sell?",
+  /*String, name of the config. explains what the idea of its strategy is.*/ "Make Money Config");
+  // END OF TEMPLATE.
+
+
+
 // Create different bot configs here.
 BotConfiguration longTermBotConfiguration = BotConfiguration(TradeMode::STOCKS_ONLY, true, oneHour, defaultConfidenceLevel, alwaysLogOutput, TradeRoutine::Routine_1, buying_prompt_longterm, buying_prompt_longterm, gemini_Sell_Recommendation_prompt, "Long Term Config");
 

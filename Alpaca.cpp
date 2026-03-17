@@ -516,7 +516,7 @@ bool AlpacaAccount::placeBuyOrder(String symbol, float notionAmount) {
           Serial.print(amountString);
           Serial.print(" of ");
           Serial.println(symbol);
-          delay(1000);  // Small delay to ensure API processes before next move
+          delay(1000);
         }
       }
     }

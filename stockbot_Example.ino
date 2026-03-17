@@ -11,14 +11,8 @@
 #define PIN 38
 #define NUMPIXELS 1
 
-/*
-things changed:
-got rid of 'minimum investment. whether or not anything is invested is entirely dependany on ai and its prompt.'
-allow the ai to recommend 0 things to buy and if it does, it wont buy anything now instead of being forced to. 
 
-added the 'assetminimum' of $20, this will prevent it from have only like pennies or few dolalrs in things.
-changed selling prompt to make it make the ai determine what noise levels are 
-*/
+// INSERT REAL CREDS HERE!
 
 //////////////////////////////////////////////////////////
 // #ifndef PAPER_API_KEY
@@ -37,20 +31,17 @@ changed selling prompt to make it make the ai determine what noise levels are
 // #define GEMINI_KEY "PASTE_GEMINI_KEY_HERE"
 // #endif
 /////////////////////////////////////////////
-const bool PAPER = false;            //////
-const int startingInvestment = 700;  //////
+const bool PAPER = false;            ////// if true, it will use 'PAPER_API_KEY' and 'REAL_API_SECRET'; if false will use 'REAL_API_KEY' and 'REAL_API_SECRET'
+const int startingInvestment = 700;  /////. set this to amount you put into alpaca account. use to let ai know how much to recommend to invest as well as calculate total account percent gain or loss.
 /////////////////////////////////////////////
 BotConfiguration defaultBotConfig;  /////
 ////////////////////////////////////////////
-
-
+const char* ssid = "Province.SynergyWifi.com";
+const char* password = "coldfang75";
 
 
 // StockBot stockbot(PAPER, startingInvestment, REAL_API_KEY, REAL_API_SECRET, PAPER_API_KEY, PAPER_API_KEY_SECRET, GEMINI_KEY, defaultBotConfig);
 StockBot stockbot(PAPER, startingInvestment, REAL_API_KEY, REAL_API_SECRET, PAPER_API_KEY, PAPER_API_KEY_SECRET, GEMINI_KEY, longTermBotConfiguration);
-
-
-
 
 bool everythingWorking = false;
 const unsigned long interval = 3600000 * 3;  // 3 hour in milliseconds
@@ -60,20 +51,14 @@ const unsigned long printInterval = 600000;  // 10 minutes in ms
 unsigned long blinkTimer;
 bool blink;
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
-// const char* ssid = "NEiPhone";
-// const char* password = "12345678";
-const char* ssid = "Province.SynergyWifi.com";
-const char* password = "coldfang75";
-// const char* ssid = "eriksen99";
-// const char* password = "DCchiro99";
-unsigned long currentMillis = millis();  // <--- ADD THIS LINE
+unsigned long currentMillis = millis();
 
 
 void setup() {
-  Serial.begin(9600);   // Make sure your Serial Monitor matches this
-  pixels.begin();       // begin lights and turn them off
-  delay(1000);          // Give serial time to start
-  WiFi.mode(WIFI_STA);  // Explicitly set station mode
+  Serial.begin(9600);
+  pixels.begin();
+  delay(1000);
+  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
 
   if (psramFound()) {
@@ -101,19 +86,14 @@ void setup() {
     1,             /* Priority of the task */
     NULL,          /* Task handle */
     0);            /* Core 0 */
+
+  stockbot.account.print__serialized_portfolio_and_account();
 }
-
-
-
-
 
 
 void loop() {
 
-
   stockbot.monitor();
-
-
 
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
@@ -174,9 +154,7 @@ void loop() {
 
 
 void pixelTaskCode(void* pvParameters) {
-  // A FreeRTOS task MUST have an infinite loop to stay alive
   for (;;) {
-    // Your exact blink timing logic
     if (millis() - blinkTimer >= 4000) {
       blinkTimer = millis();
       blink = !blink;
@@ -196,15 +174,11 @@ void pixelTaskCode(void* pvParameters) {
         }
       }
 
-
-
-
-
     } else {
       // Your exact "off" logic
       if (stockbot.getStatus() == Status::ERROR) {  // solid red.
         pixels.setPixelColor(0, pixels.Color(0, 255, 0));
-      } else if (stockbot.getStatus() == Status::BUSY) { // flash blue
+      } else if (stockbot.getStatus() == Status::BUSY) {  // flash blue
         pixels.setPixelColor(0, pixels.Color(0, 0, 50));
       } else {
         pixels.setPixelColor(0, pixels.Color(0, 0, 0));  // blink green or red on and off.

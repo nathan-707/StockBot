@@ -34,7 +34,6 @@ StockBot::StockBot(bool is_paperTrading, int totalAccountInvestmentIntoAccount,
 
   apiKey = geminiKey;
   this->configuration = configuration;
- 
 }
 
 
@@ -159,7 +158,28 @@ bool StockBot::sellAllGeminiSellSuggestions() {
           continue;
         }
 
-        if (geminiRecommendedPositionsToSell[w].action == SellAction::SELL_HALF) {
+// first check if ai said sell all, or if it said sell half AND if it sold half it would be below the assetMarketValueMinimumToHold.
+        if (geminiRecommendedPositionsToSell[w].action == SellAction::SELL_ALL
+            ||
+            geminiRecommendedPositionsToSell[w].action == SellAction::SELL_HALF && (account.allPositions[i].marketValue / 2) < assetMarketValueMinimumToHold
+        ) {
+          if (geminiRecommendedPositionsToSell[w].action == SellAction::SELL_HALF && (account.allPositions[i].marketValue / 2) < assetMarketValueMinimumToHold){
+            Serial.println("ai said only sell half, but if it did that its value would be below assetMarketValueMinimumToHold, so instead selling all of it.");
+          }
+          float all = account.allPositions[i].qty_available;
+          bool success = account.closePosition(account.allPositions[i].symbol);
+          if (success) {
+            Serial.print("Sold ALL of ");
+            Serial.println(account.allPositions[i].symbol);
+            soldSomething = true;
+          } else {
+            Serial.print("Failed to sell all of ");
+            Serial.println(account.allPositions[i].symbol);
+          }
+          delay(500);
+        }
+
+        else if (geminiRecommendedPositionsToSell[w].action == SellAction::SELL_HALF) {
           float half = account.allPositions[i].qty_available / 2;
           bool success = account.placeSellOrder(account.allPositions[i].symbol, half);
           if (success) {
@@ -173,8 +193,14 @@ bool StockBot::sellAllGeminiSellSuggestions() {
           delay(500);
         }
 
-        else if (geminiRecommendedPositionsToSell[w].action == SellAction::SELL_ALL) {
-          float all = account.allPositions[i].qty_available;
+        else if (account.allPositions[i].marketValue < assetMarketValueMinimumToHold) {  // position is lower than assetMarketValueMinimumToHold. selling it.
+
+          Serial.print(account.allPositions[i].symbol);
+          Serial.print(" has a market value of ");
+          Serial.print(account.allPositions[i].marketValue);
+          Serial.print(" which is lower than the assetMarketValueMinimumToHold.");
+          Serial.println("liquidating...");
+
           bool success = account.closePosition(account.allPositions[i].symbol);
           if (success) {
             Serial.print("Sold ALL of ");
@@ -185,6 +211,7 @@ bool StockBot::sellAllGeminiSellSuggestions() {
             Serial.println(account.allPositions[i].symbol);
           }
           delay(500);
+
         }
 
         else {
@@ -672,7 +699,7 @@ void StockBot::buyDiversifiedGeminiStockSuggestions(float dollarsToInvest, float
   float wagerChunk = dollarsToInvest / numberOfValidStocks;
 
   if (wagerChunk < assetBuyMinimum) {
-    wagerChunk = 20;
+    wagerChunk = assetBuyMinimum;
   }
 
   // 2. Iterate through the WHOLE list again
@@ -727,8 +754,6 @@ void StockBot::buyFirstGeminiStockSuggestion(float dollarsToInvest) {
     return;
   }
 
-
-
   for (int i = 0; i < maxSize; i++) {
     if (geminiBuyRecommendation.recommendedStocks[i].symbol == "nostock") {
       continue;
@@ -759,7 +784,7 @@ void StockBot::buyFirstGeminiStockSuggestion(float dollarsToInvest) {
 void StockBot::getTimeUntilNextRoutine() {
 
 
-   Serial.println(configuration.name);
+  Serial.println(configuration.name);
   Serial.println(configuration.reinvestIfRecommended ? "Reinvesting" : "Reinvesting off");
   Serial.println(configuration.minimum_AI_Confidence_Level_In_Order_To_BUY);
 
@@ -803,7 +828,7 @@ void StockBot::monitor() {
   }
 
   monitorTimer = millis();
-  
+
   Serial.print("\n" + configuration.name);
   Serial.print(": ");
 
