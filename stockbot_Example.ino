@@ -32,7 +32,7 @@
 // #endif
 /////////////////////////////////////////////
 const bool PAPER = false;            ////// if true, it will use 'PAPER_API_KEY' and 'REAL_API_SECRET'; if false will use 'REAL_API_KEY' and 'REAL_API_SECRET'
-const int startingInvestment = 700;  /////. set this to amount you put into alpaca account. use to let ai know how much to recommend to invest as well as calculate total account percent gain or loss.
+const int startingInvestment = 1200;  /////. set this to amount you put into alpaca account. use to let ai know how much to recommend to invest as well as calculate total account percent gain or loss.
 /////////////////////////////////////////////
 BotConfiguration defaultBotConfig;  /////
 ////////////////////////////////////////////
@@ -55,7 +55,7 @@ unsigned long currentMillis = millis();
 
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   pixels.begin();
   delay(1000);
   WiFi.mode(WIFI_STA);
@@ -67,8 +67,11 @@ void setup() {
     Serial.printf("Free PSRAM: %d bytes\n", ESP.getFreePsram());
   } else {
     delay(3000);
-    Serial.println("PSRAM NOT found or NOT enabled!");
-    delay(999999);
+
+    while (true) {
+      Serial.println("PSRAM NOT found or NOT enabled!");
+      delay(1000);
+    }
   }
 
   Serial.print("Connecting to WiFi");
@@ -147,11 +150,18 @@ void loop() {
     }
   }
 
+  static unsigned long lastReconnectAttempt = 0;
   if (WiFi.status() != WL_CONNECTED) {
-    WiFi.reconnect();
+    if (millis() - lastReconnectAttempt >= 5000) {
+      Serial.println("WiFi connection lost. Attempting to reconnect...");
+      WiFi.disconnect();
+      WiFi.reconnect();
+      lastReconnectAttempt = millis();
+    }
   }
 }
 
+const int lightOnBrightness = 50;
 
 void pixelTaskCode(void* pvParameters) {
   for (;;) {
@@ -166,7 +176,7 @@ void pixelTaskCode(void* pvParameters) {
         pixels.setPixelColor(0, pixels.Color(0, 255, 0));
       } else {
         if (stockbot.getStatus() == Status::WORKING) {  // working
-          pixels.setPixelColor(0, pixels.Color(50, 0, 0));
+          pixels.setPixelColor(0, pixels.Color(lightOnBrightness, 0, 0));
         } else if (stockbot.getStatus() == Status::ERROR) {  // error
           pixels.setPixelColor(0, pixels.Color(0, 255, 0));
         } else if (stockbot.getStatus() == Status::BUSY) {  // ai

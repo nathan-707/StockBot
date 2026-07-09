@@ -65,8 +65,7 @@ struct BotConfiguration {
                    String buying_prompt_stocks,
                    String buying_prompt_crypto,
                    String selling_prompt,
-                   String name
-                   ) {
+                   String name) {
     this->assetTypeToBeBought = assetTypeToBeBought;
     this->reinvestIfRecommended = reinvestIfRecommended;
     this->ai_check_interval_HOURS = ai_check_interval_HOURS;
@@ -118,8 +117,8 @@ private:
   bool succesfullyGotSellSuggestions = true;
   bool succesfullyGotBuySuggestions = true;
   bool noGeminiBuyRecommendations();
-  const int assetBuyMinimum = 50;  // minimum amount that can be put into a asset.
-  const int assetMarketValueMinimumToHold = 20; // if position market value is below this, it will auto liquidate it because it not worth evaluting such a low value position.
+  const int assetBuyMinimum = 50;                // minimum amount that can be put into a asset.
+  const int assetMarketValueMinimumToHold = 20;  // if position market value is below this, it will auto liquidate it because it not worth evaluting such a low value position.
   bool marketIsOpen();
   bool timeNotConfigured = true;
   void clearGeminiBuyRecommendations();
@@ -129,7 +128,7 @@ private:
   // gemini info and addresses
   String apiKey;
   const char* host = "generativelanguage.googleapis.com";
-  const String url = "/v1beta/models/gemini-3-pro-preview:generateContent";
+  const String url = "/v1beta/models/gemini-3.1-pro-preview:generateContent";
   // prompts:
 };
 

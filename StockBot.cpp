@@ -158,12 +158,10 @@ bool StockBot::sellAllGeminiSellSuggestions() {
           continue;
         }
 
-// first check if ai said sell all, or if it said sell half AND if it sold half it would be below the assetMarketValueMinimumToHold.
+        // first check if ai said sell all, or if it said sell half AND if it sold half it would be below the assetMarketValueMinimumToHold.
         if (geminiRecommendedPositionsToSell[w].action == SellAction::SELL_ALL
-            ||
-            geminiRecommendedPositionsToSell[w].action == SellAction::SELL_HALF && (account.allPositions[i].marketValue / 2) < assetMarketValueMinimumToHold
-        ) {
-          if (geminiRecommendedPositionsToSell[w].action == SellAction::SELL_HALF && (account.allPositions[i].marketValue / 2) < assetMarketValueMinimumToHold){
+            || geminiRecommendedPositionsToSell[w].action == SellAction::SELL_HALF && (account.allPositions[i].marketValue / 2) < assetMarketValueMinimumToHold) {
+          if (geminiRecommendedPositionsToSell[w].action == SellAction::SELL_HALF && (account.allPositions[i].marketValue / 2) < assetMarketValueMinimumToHold) {
             Serial.println("ai said only sell half, but if it did that its value would be below assetMarketValueMinimumToHold, so instead selling all of it.");
           }
           float all = account.allPositions[i].qty_available;
@@ -428,6 +426,8 @@ bool StockBot::getGemini_BUY_Suggestions(BotConfiguration configuration) {
   client.stop();  // Ensure socket is closed
 
   Serial.println("Response received!");
+
+  Serial.println(responseBody);
 
   // --- FIX START: Handle Chunked Encoding / Header Garbage ---
   // The raw socket might return "43f6\r\n{...". We must skip to the first '{'.
@@ -828,9 +828,12 @@ void StockBot::monitor() {
   }
 
   monitorTimer = millis();
-
-  Serial.print("\n" + configuration.name);
-  Serial.print(": ");
+  Serial.println("\n" + configuration.name);
+  Serial.println(configuration.reinvestIfRecommended ? "Reinvesting" : "Reinvesting off");
+  Serial.print("Minimum Confidence: ");
+  Serial.println(configuration.minimum_AI_Confidence_Level_In_Order_To_BUY);
+  Serial.print(configuration.ai_check_interval_HOURS);
+  Serial.println(" hours between checks.");
 
   if (configuration.routine == TradeRoutine::Routine_1) {
 

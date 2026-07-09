@@ -60,7 +60,7 @@ BotConfiguration templateConfig = BotConfiguration(
 
 
 // Create different bot configs here.
-BotConfiguration longTermBotConfiguration = BotConfiguration(TradeMode::STOCKS_ONLY, true, oneHour, defaultConfidenceLevel, alwaysLogOutput, TradeRoutine::Routine_1, buying_prompt_longterm, buying_prompt_longterm, gemini_Sell_Recommendation_prompt, "Long Term Config");
+BotConfiguration longTermBotConfiguration = BotConfiguration(TradeMode::STOCKS_AND_CRYPTO, true, 24, defaultConfidenceLevel, alwaysLogOutput, TradeRoutine::Routine_1, buying_prompt_longterm, buying_prompt_longterm, gemini_Sell_Recommendation_prompt, "Long Term Config");
 
 
 BotConfiguration cryptoScalperConfig = BotConfiguration(
@@ -137,10 +137,56 @@ BotConfiguration contrarianFearBuyer = BotConfiguration(
 
 
 
+BotConfiguration dayTraderConfig = BotConfiguration(
+  TradeMode::STOCKS_AND_CRYPTO, 
+  true, 
+  1, 
+  0.60, 
+  true, 
+  TradeRoutine::Routine_1, 
+  "Look for high-volatility stocks with unusually high daily volume and momentum. Focus on intraday breakouts and news-driven catalysts.", 
+  "Find top 100 cryptocurrencies with sudden spikes in trading volume and price over the last hour. Buy if the short-term trend is strongly bullish.", 
+  "Sell quickly if the asset drops by 1.5% from the entry price (tight stop-loss), or take profit at 3-5% gains. Do not hold overnight if possible.", 
+  "Day Trader"
+);
 
+BotConfiguration etfSafeHavenConfig = BotConfiguration(
+  TradeMode::STOCKS_ONLY, 
+  true, 
+  48, 
+  0.85, 
+  true, 
+  TradeRoutine::Routine_1, 
+  "Focus exclusively on broad market ETFs (like SPY, VOO, QQQ) and sector ETFs. Buy only when the broader market is in a confirmed uptrend and the ETF is near a strong support level.", 
+  "", 
+  "Sell only if macroeconomic indicators turn severely bearish or if the ETF drops below its 200-day moving average.", 
+  "ETF Safe Haven"
+);
 
+BotConfiguration cryptoWhaleWatcherConfig = BotConfiguration(
+  TradeMode::CRYPTO_ONLY, 
+  true, 
+  4, 
+  0.75, 
+  true, 
+  TradeRoutine::Routine_1, 
+  "", 
+  "Analyze on-chain data and whale wallet movements. Buy cryptocurrencies that are experiencing massive inflows from large holders while the price is still consolidating.", 
+  "Sell when whale wallets start moving large amounts to exchanges or if the asset's price goes parabolic and becomes overextended.", 
+  "Crypto Whale Watcher"
+);
 
-
-
+BotConfiguration pennyStockGamblerConfig = BotConfiguration(
+  TradeMode::STOCKS_ONLY, 
+  false, 
+  1, 
+  0.50, 
+  true, 
+  TradeRoutine::Routine_1, 
+  "Search for penny stocks (under $5) with massive pre-market or intraday volume spikes. Look for short squeeze potential or hype-driven momentum.", 
+  "", 
+  "Sell aggressively. Take initial profits at 10% and sell the rest at 20%. Cut losses instantly if the stock drops more than 5%.", 
+  "Penny Stock Gambler"
+);
 
 #endif
